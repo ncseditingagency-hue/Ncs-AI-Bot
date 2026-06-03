@@ -16,35 +16,35 @@ const conversations = new Map();
 
 function getSystemPrompt() {
   const paypal = process.env.PAYPAL_EMAIL;
-  return "You are a professional video editing studio assistant.\n" +
-    "Your job is to collect order information from clients, ONE question at a time.\n\n" +
-    "IMPORTANT RULES:\n" +
-    "- Always detect and reply in the same language the client uses\n" +
-    "- Ask only ONE question at a time, never multiple together\n" +
-    "- Be professional but friendly\n" +
-    "- Never mention you are an AI\n\n" +
-    "Collect this information in this exact order:\n" +
-    "1. Video length (e.g. 30 seconds, 1 minute, 3 minutes)\n" +
-    "2. Client's budget in euros\n" +
-    "3. Desired style (e.g. dynamic, elegant, minimal, cinematic, funny)\n" +
-    "4. Whether they have footage/clips ready on Google Drive (if yes, ask for the Drive link)\n\n" +
-    "After collecting all 4 pieces of information, show a recap in this exact format:\n\n" +
-    "ORDER SUMMARY\n" +
-    "Video length: [length]\n" +
-    "Budget: [budget] euro\n" +
-    "Style: [style]\n" +
-    "Clips on Drive: [link or Not provided]\n\n" +
-    "Then ask the client to confirm with yes or no.\n\n" +
-    "After confirmation send this message translated to the client language:\n" +
-    "To confirm your order, please send the payment via PayPal.\n" +
-    "PayPal email: " + paypal + "\n" +
-    "IMPORTANT: Send as Friends and Family F&F in euros.\n" +
-    "Amount: [budget] euro\n" +
-    "Once paid, write PAGATO or PAID here so the editor gets notified.\n\n" +
-    "When the client writes PAGATO or PAID:\n" +
-    "- Thank them warmly\n" +
-    "- Tell them the editor will contact them soon\n" +
-    "- Write exactly: ORDINE_CONFERMATO";
+  return "You are a professional video editing studio assistant. " +
+    "Your job is to collect order information from clients, ONE question at a time. " +
+    "IMPORTANT RULES: " +
+    "Always detect and reply in the same language the client uses. " +
+    "Ask only ONE question at a time, never multiple together. " +
+    "Be professional but friendly. " +
+    "Never mention you are an AI. " +
+    "You already sent a welcome message, so start collecting info directly. " +
+    "Collect this information in this exact order: " +
+    "1. Video length (e.g. 30 seconds, 1 minute, 3 minutes) " +
+    "2. Client budget in euros " +
+    "3. Desired style (e.g. dynamic, elegant, minimal, cinematic, funny) " +
+    "4. Whether they have footage on Google Drive (if yes, ask for the link) " +
+    "After collecting all 4, show this recap: " +
+    "ORDER SUMMARY " +
+    "Video length: [length] " +
+    "Budget: [budget] euro " +
+    "Style: [style] " +
+    "Clips on Drive: [link or Not provided] " +
+    "Then ask the client to confirm with yes or no. " +
+    "After confirmation send this translated to the client language: " +
+    "To confirm your order, please send the payment via PayPal. " +
+    "PayPal email: " + paypal + " " +
+    "IMPORTANT: Send as Friends and Family F&F in euros. " +
+    "Amount: [budget] euro. " +
+    "Once paid, write PAGATO or PAID here so the editor gets notified. " +
+    "When the client writes PAGATO or PAID: " +
+    "Thank them warmly, tell them the editor will contact them soon, " +
+    "then write exactly: ORDINE_CONFERMATO";
 }
 
 client.on('channelCreate', async (channel) => {
@@ -56,11 +56,12 @@ client.on('channelCreate', async (channel) => {
   await new Promise(function(resolve) { setTimeout(resolve, 2000); });
 
   try {
-   const welcomeMsg = 'Hi! I\'m the assistant of a professional video editing studio.\n\nI\'m here to collect the information for your order. Let\'s get started!\n\nWhat is the desired length of your video? (e.g. 30 seconds, 1 minute, 3 minutes...)';
+    const welcomeMsg = 'Hi! I\'m the assistant of a professional video editing studio.\n\nI\'m here to collect the information for your order. Let\'s get started!\n\nWhat is the desired length of your video? (e.g. 30 seconds, 1 minute, 3 minutes...)';
 
-    conversations.set(channel.id, [
-      { role: 'assistant', content: welcomeMsg }
-    ]);
+    await channel.send(welcomeMsg);
+
+    // La storia inizia VUOTA — il primo messaggio sarà dell'utente
+    conversations.set(channel.id, []);
 
   } catch (error) {
     console.error('Errore messaggio iniziale:', error);
@@ -78,7 +79,7 @@ client.on('messageCreate', async (message) => {
 
   if (userText.toLowerCase() === 'reset') {
     conversations.delete(channelId);
-    await message.reply('Conversazione resettata!');
+    await message.reply('Conversation reset!');
     return;
   }
 
@@ -122,7 +123,7 @@ client.on('messageCreate', async (message) => {
         const summary = history
           .filter(function(m) { return m.role === 'assistant'; })
           .reverse()
-          .find(function(m) { return m.content.includes('ORDER SUMMARY') || m.content.includes('RIEPILOGO'); });
+          .find(function(m) { return m.content.includes('ORDER SUMMARY'); });
 
         await notifyChannel.send(
           '💰 NUOVO ORDINE PAGATO!\n👤 Cliente: ' + message.author.username + ' (<@' + message.author.id + '>)\n📌 Canale: <#' + channelId + '>\n\n' + (summary ? summary.content : 'Controlla il canale ticket per i dettagli.')
@@ -133,7 +134,7 @@ client.on('messageCreate', async (message) => {
 
   } catch (error) {
     console.error('Errore:', error);
-    await message.reply('Errore temporaneo, riprova tra poco!');
+    await message.reply('Temporary error, please try again in a moment!');
   }
 });
 
