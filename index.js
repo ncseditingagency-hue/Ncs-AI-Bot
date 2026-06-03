@@ -56,9 +56,7 @@ client.on('channelCreate', async (channel) => {
   await new Promise(function(resolve) { setTimeout(resolve, 2000); });
 
   try {
-    const welcomeMsg = 'Ciao! Sono l\'assistente dello studio di video editing.\n\nSono qui per raccogliere le informazioni per il tuo ordine. Iniziamo!\n\nQual e\' la lunghezza del video che desideri? (es. 30 secondi, 1 minuto, 3 minuti...)';
-
-    await channel.send(welcomeMsg);
+   const welcomeMsg = 'Hi! I\'m the assistant of a professional video editing studio.\n\nI\'m here to collect the information for your order. Let\'s get started!\n\nWhat is the desired length of your video? (e.g. 30 seconds, 1 minute, 3 minutes...)';
 
     conversations.set(channel.id, [
       { role: 'assistant', content: welcomeMsg }
