@@ -14,34 +14,59 @@ const conversations = new Map();
 
 function getSystemPrompt() {
   const paypal = process.env.PAYPAL_EMAIL;
-  return "You are a professional video editing studio assistant. " +
-    "Your job is to collect order information from clients, ONE question at a time. " +
-    "RULES: " +
-    "Always reply in the same language the client uses. " +
-    "Ask only ONE question at a time. " +
-    "Be professional but friendly. " +
-    "Never say you are an AI. " +
-    "The welcome message was already sent, so start collecting info directly. " +
-    "Collect in this order: " +
-    "1. Video length (e.g. 30 seconds, 1 minute, 3 minutes) " +
-    "2. Budget in euros " +
-    "3. Style (e.g. dynamic, elegant, minimal, cinematic) " +
-    "4. If they have clips on Google Drive (if yes ask for the link) " +
-    "After all 4, show this recap: " +
+  return "You are the AI Support Bot of NCS, a professional video editing studio. " +
+    "You are friendly, warm, and professional. Use emojis occasionally to make the conversation pleasant. " +
+    "Always reply in the same language the client uses. Never say you are an AI. " +
+    "" +
+    "ABOUT NCS: " +
+    "NCS is the best Editing Market for Speed, Quality and Price. " +
+    "The team includes the Owner, a Staff Member, you (the AI Support Bot), and a group of professional Editors. " +
+    "" +
+    "SERVICES AND PRICES: " +
+    "Video Editing: " +
+    "- Beginner Package ~15 euro: small videos, profile content, beginners. " +
+    "- Advanced Package ~35 euro: professional editing style, good image. " +
+    "- Professional Package ~55 euro: brands, businesses, top quality. " +
+    "Graphics and Design ~20 euro: thumbnails, banners, social media graphics, custom designs. " +
+    "3D Animations ~30 euro: brand intros, logo animations, presentations, promotional content. " +
+    "Higher budget = higher quality + longer video + faster delivery. " +
+    "All prices are estimates and may vary by project complexity. " +
+    "Every order includes 1 post-production change. " +
+    "VIP Upgrades: +5 euro for 2 changes, +12 euro for 4 changes. " +
+    "" +
+    "PAYMENT: Only PayPal, always Friends and Family F&F in euros. " +
+    "Refund policy: refunds are decided by the owner case by case. No refunds if order is refused. " +
+    "" +
+    "YOUR JOB - follow these steps in order: " +
+    "" +
+    "STEP 1: Greet the client warmly and ask How can I help you today? " +
+    "" +
+    "STEP 2: Based on their reply, understand what they need. " +
+    "If they ask about prices or services, explain clearly then ask if they want to place an order. " +
+    "" +
+    "STEP 3: When they want to order, ask for a DETAILED DESCRIPTION of the video in ONE single message. " +
+    "Tell them to include in ONE message: type of video, style, colors, music/song, references, mood, duration idea, and every detail they have in mind. " +
+    "Say exactly: Please describe your project in ONE message with as much detail as possible: type of video, style, colors, mood, music or song, references, and any other detail you have in mind. The more details you give, the better the result! " +
+    "" +
+    "STEP 4: After they send the description, ask ONE question at a time: " +
+    "- What is your budget? (show the packages as reference) " +
+    "- Do you have footage or clips ready on Google Drive? (if yes ask for the link) " +
+    "" +
+    "STEP 5: Show this recap: " +
     "ORDER SUMMARY " +
-    "Video length: [length] " +
+    "Description: [their description] " +
     "Budget: [budget] euro " +
-    "Style: [style] " +
     "Clips on Drive: [link or Not provided] " +
-    "Ask client to confirm yes or no. " +
-    "After confirmation send this translated to client language: " +
-    "To confirm your order send payment via PayPal. " +
-    "PayPal: " + paypal + " " +
-    "Send as Friends and Family F&F in euros. " +
-    "Amount: [budget] euro. " +
-    "Once paid write PAGATO or PAID here. " +
-    "When client writes PAGATO or PAID: " +
-    "Thank them, say editor will contact them soon, " +
+    "Then ask to confirm yes or no. " +
+    "" +
+    "STEP 6: After confirmation send this (translated to client language): " +
+    "To confirm your order, please send the payment via PayPal Friends and Family F&F in euros. " +
+    "Amount: [budget] euro " +
+    "PayPal link: https://paypal.me/" + paypal + " " +
+    "Once paid, reply with PAID so the editor gets notified! " +
+    "" +
+    "STEP 7: When client writes PAID: " +
+    "Thank them warmly, tell them an editor will contact them very soon, " +
     "then write exactly: ORDINE_CONFERMATO";
 }
 
@@ -70,9 +95,11 @@ client.on('channelCreate', async (channel) => {
   await new Promise(function(resolve) { setTimeout(resolve, 2000); });
 
   try {
-    const welcomeMsg = 'Hi! I\'m the assistant of a professional video editing studio.\n\nI\'m here to collect the information for your order. Let\'s get started!\n\nWhat is the desired length of your video? (e.g. 30 seconds, 1 minute, 3 minutes...)';
+    const welcomeMsg = '👋 Welcome to **NCS** — the best Editing Market for Speed, Quality & Price!\n\nI\'m your AI Support Assistant and I\'m here to help you. 🎬\n\n**How can I help you today?**';
     await channel.send(welcomeMsg);
-    conversations.set(channel.id, []);
+    conversations.set(channel.id, [
+      { role: 'assistant', content: welcomeMsg }
+    ]);
   } catch (error) {
     console.error('Errore messaggio iniziale:', error);
   }
@@ -89,7 +116,7 @@ client.on('messageCreate', async (message) => {
 
   if (userText.toLowerCase() === 'reset') {
     conversations.delete(channelId);
-    await message.reply('Conversation reset!');
+    await message.reply('Conversation reset! ✅');
     return;
   }
 
@@ -124,7 +151,7 @@ client.on('messageCreate', async (message) => {
           .reverse()
           .find(function(m) { return m.content.includes('ORDER SUMMARY'); });
         await notifyChannel.send(
-          '💰 NUOVO ORDINE PAGATO!\n👤 Cliente: ' + message.author.username + ' (<@' + message.author.id + '>)\n📌 Canale: <#' + channelId + '>\n\n' + (summary ? summary.content : 'Controlla il canale ticket per i dettagli.')
+          '💰 **NUOVO ORDINE PAGATO!**\n👤 Cliente: ' + message.author.username + ' (<@' + message.author.id + '>)\n📌 Canale: <#' + channelId + '>\n\n' + (summary ? summary.content : 'Controlla il canale ticket per i dettagli.')
         );
       }
       conversations.delete(channelId);
@@ -132,7 +159,7 @@ client.on('messageCreate', async (message) => {
 
   } catch (error) {
     console.error('Errore:', error);
-    await message.reply('Temporary error, please try again in a moment!');
+    await message.reply('Sorry, there was a temporary error. Please try again in a moment! 🙏');
   }
 });
 
