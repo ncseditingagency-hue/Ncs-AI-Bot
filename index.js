@@ -18,32 +18,32 @@ function getSystemPrompt() {
   const paypal = process.env.PAYPAL_EMAIL;
   return "You are a professional video editing studio assistant. " +
     "Your job is to collect order information from clients, ONE question at a time. " +
-    "IMPORTANT RULES: " +
-    "Always detect and reply in the same language the client uses. " +
-    "Ask only ONE question at a time, never multiple together. " +
+    "RULES: " +
+    "Always reply in the same language the client uses. " +
+    "Ask only ONE question at a time. " +
     "Be professional but friendly. " +
-    "Never mention you are an AI. " +
-    "You already sent a welcome message, so start collecting info directly. " +
-    "Collect this information in this exact order: " +
+    "Never say you are an AI. " +
+    "The welcome message was already sent, so start collecting info directly. " +
+    "Collect in this order: " +
     "1. Video length (e.g. 30 seconds, 1 minute, 3 minutes) " +
-    "2. Client budget in euros " +
-    "3. Desired style (e.g. dynamic, elegant, minimal, cinematic, funny) " +
-    "4. Whether they have footage on Google Drive (if yes, ask for the link) " +
-    "After collecting all 4, show this recap: " +
+    "2. Budget in euros " +
+    "3. Style (e.g. dynamic, elegant, minimal, cinematic) " +
+    "4. If they have clips on Google Drive (if yes ask for the link) " +
+    "After all 4, show this recap: " +
     "ORDER SUMMARY " +
     "Video length: [length] " +
     "Budget: [budget] euro " +
     "Style: [style] " +
     "Clips on Drive: [link or Not provided] " +
-    "Then ask the client to confirm with yes or no. " +
-    "After confirmation send this translated to the client language: " +
-    "To confirm your order, please send the payment via PayPal. " +
-    "PayPal email: " + paypal + " " +
-    "IMPORTANT: Send as Friends and Family F&F in euros. " +
+    "Ask client to confirm yes or no. " +
+    "After confirmation send this (translated to client language): " +
+    "To confirm your order send payment via PayPal. " +
+    "PayPal: " + paypal + " " +
+    "Send as Friends and Family F&F in euros. " +
     "Amount: [budget] euro. " +
-    "Once paid, write PAGATO or PAID here so the editor gets notified. " +
-    "When the client writes PAGATO or PAID: " +
-    "Thank them warmly, tell them the editor will contact them soon, " +
+    "Once paid write PAGATO or PAID here. " +
+    "When client writes PAGATO or PAID: " +
+    "Thank them, say editor will contact them soon, " +
     "then write exactly: ORDINE_CONFERMATO";
 }
 
@@ -51,18 +51,14 @@ client.on('channelCreate', async (channel) => {
   if (!channel.isTextBased()) return;
   if (!channel.name.toLowerCase().includes('ticket')) return;
 
-  console.log('Nuovo ticket rilevato: ' + channel.name);
+  console.log('Nuovo ticket: ' + channel.name);
 
   await new Promise(function(resolve) { setTimeout(resolve, 2000); });
 
   try {
     const welcomeMsg = 'Hi! I\'m the assistant of a professional video editing studio.\n\nI\'m here to collect the information for your order. Let\'s get started!\n\nWhat is the desired length of your video? (e.g. 30 seconds, 1 minute, 3 minutes...)';
-
     await channel.send(welcomeMsg);
-
-    // La storia inizia VUOTA — il primo messaggio sarà dell'utente
     conversations.set(channel.id, []);
-
   } catch (error) {
     console.error('Errore messaggio iniziale:', error);
   }
@@ -96,7 +92,7 @@ client.on('messageCreate', async (message) => {
     await message.channel.sendTyping();
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash',
       systemInstruction: getSystemPrompt(),
     });
 
@@ -119,12 +115,10 @@ client.on('messageCreate', async (message) => {
       const notifyChannelId = process.env.NOTIFY_CHANNEL_ID;
       if (notifyChannelId) {
         const notifyChannel = await client.channels.fetch(notifyChannelId);
-
         const summary = history
           .filter(function(m) { return m.role === 'assistant'; })
           .reverse()
           .find(function(m) { return m.content.includes('ORDER SUMMARY'); });
-
         await notifyChannel.send(
           '💰 NUOVO ORDINE PAGATO!\n👤 Cliente: ' + message.author.username + ' (<@' + message.author.id + '>)\n📌 Canale: <#' + channelId + '>\n\n' + (summary ? summary.content : 'Controlla il canale ticket per i dettagli.')
         );
