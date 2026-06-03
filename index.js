@@ -42,11 +42,11 @@ function getSystemPrompt() {
     "STEP 4: After they send the description, ask ONE question at a time: " +
     "First ask: What is your budget? Show the package suggestions as reference and remind them prices are flexible. " +
     "Then ask: Do you have footage or clips ready on Google Drive? If yes, ask for the link. " +
-    "STEP 5: Show the recap ALWAYS IN ITALIAN, regardless of the language used by the client, in this exact format: " +
-    "📋 **RIEPILOGO ORDINE**\n" +
-    "📝 Descrizione: [descrizione dettagliata del cliente]\n" +
+    "STEP 5: Show the recap ALWAYS in English, in this exact format: " +
+    "📋 **Order Recap**\n" +
+    "📝 Description: [descrizione dettagliata del cliente]\n" +
     "💶 Budget: [budget] euro\n" +
-    "📁 Clip su Drive: [link oppure Non fornito]\n" +
+    "📁 Clip on Drive: [link oppure Non fornito]\n" +
     "Then ask the client to confirm yes or no in their language. " +
     "STEP 6: After confirmation send this translated to the client language: " +
     "To confirm your order, please send the payment via PayPal Friends and Family F&F in euros. " +
