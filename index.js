@@ -1,6 +1,3 @@
-Vai su GitHub → `index.js` → matita ✏️ → **Ctrl+A** → cancella tutto → incolla questo:
-
-```js
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 
@@ -166,6 +163,3 @@ client.on('ready', function() {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-```
-
-Poi **"Commit changes"** → **"Commit changes"** e aspetta 30 secondi! 👇
