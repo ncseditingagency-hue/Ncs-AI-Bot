@@ -13,53 +13,134 @@ const client = new Client({
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const conversations = new Map();
-const PAYPAL_EMAIL = process.env.PAYPAL_EMAIL;
 
-const SYSTEM_PROMPT = `You are a professional video editing studio assistant.
-Your job is to collect order information from clients, ONE question at a time.
-
-IMPORTANT RULES:
-- Always detect and reply in the same language the client uses
-- Ask only ONE question at a time, never multiple together
-- Be professional but friendly
-- Never mention you are an AI
-
-Collect this information in this exact order:
-1. Video length (e.g. 30 seconds, 1 minute, 3 minutes)
-2. Client's budget in euros (€)
-3. Desired style (e.g. dynamic, elegant, minimal, cinematic, funny)
-4. Whether they have footage/clips ready on Google Drive (if yes, ask for the Drive link)
-
-After collecting all 4 pieces of information, show a recap in this exact format:
-
-📋 **ORDER SUMMARY**
-🎬 Video length: [length]
-💶 Budget: [budget]€
-🎨 Style: [style]
-📁 Clips on Drive: [link or "Not provided"]
-
-Then ask the client to confirm with yes/no.
-
-After confirmation send this (translated to the client's language):
----
-✅ Perfect! To confirm your order, please send the payment via PayPal:
-
-📧 **PayPal: ${PAYPAL_EMAIL}**
-⚠️ IMPORTANT: Send as **Friends & Family (F&F)** in **euros (€)**
-💶 Amount: [budget]€
-
-Once paid, write **PAGATO** (or PAID) here so the editor gets notified!
----
-
-When the client writes "PAGATO" or "PAID":
-- Thank them warmly
-- Tell them the editor will contact them soon
-- Write exactly: ORDINE_CONFERMATO`;
+function getSystemPrompt() {
+  const paypal = process.env.PAYPAL_EMAIL;
+  return "You are a professional video editing studio assistant.\n" +
+    "Your job is to collect order information from clients, ONE question at a time.\n\n" +
+    "IMPORTANT RULES:\n" +
+    "- Always detect and reply in the same language the client uses\n" +
+    "- Ask only ONE question at a time, never multiple together\n" +
+    "- Be professional but friendly\n" +
+    "- Never mention you are an AI\n\n" +
+    "Collect this information in this exact order:\n" +
+    "1. Video length (e.g. 30 seconds, 1 minute, 3 minutes)\n" +
+    "2. Client's budget in euros\n" +
+    "3. Desired style (e.g. dynamic, elegant, minimal, cinematic, funny)\n" +
+    "4. Whether they have footage/clips ready on Google Drive (if yes, ask for the Drive link)\n\n" +
+    "After collecting all 4 pieces of information, show a recap in this exact format:\n\n" +
+    "ORDER SUMMARY\n" +
+    "Video length: [length]\n" +
+    "Budget: [budget] euro\n" +
+    "Style: [style]\n" +
+    "Clips on Drive: [link or Not provided]\n\n" +
+    "Then ask the client to confirm with yes or no.\n\n" +
+    "After confirmation send this message translated to the client language:\n" +
+    "To confirm your order, please send the payment via PayPal.\n" +
+    "PayPal email: " + paypal + "\n" +
+    "IMPORTANT: Send as Friends and Family F&F in euros.\n" +
+    "Amount: [budget] euro\n" +
+    "Once paid, write PAGATO or PAID here so the editor gets notified.\n\n" +
+    "When the client writes PAGATO or PAID:\n" +
+    "- Thank them warmly\n" +
+    "- Tell them the editor will contact them soon\n" +
+    "- Write exactly: ORDINE_CONFERMATO";
+}
 
 client.on('channelCreate', async (channel) => {
   if (!channel.isTextBased()) return;
   if (!channel.name.toLowerCase().includes('ticket')) return;
 
-  console.log(`🎫 Nuovo ticket rilevato: ${channel.name}`);
+  console.log('Nuovo ticket rilevato: ' + channel.name);
 
-  await new Promise(resolve => setTimeout(resolve, 200
+  await new Promise(function(resolve) { setTimeout(resolve, 2000); });
+
+  try {
+    const welcomeMsg = 'Ciao! Sono l\'assistente dello studio di video editing.\n\nSono qui per raccogliere le informazioni per il tuo ordine. Iniziamo!\n\nQual e\' la lunghezza del video che desideri? (es. 30 secondi, 1 minuto, 3 minuti...)';
+
+    await channel.send(welcomeMsg);
+
+    conversations.set(channel.id, [
+      { role: 'assistant', content: welcomeMsg }
+    ]);
+
+  } catch (error) {
+    console.error('Errore messaggio iniziale:', error);
+  }
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  if (!conversations.has(message.channelId)) return;
+
+  const channelId = message.channelId;
+  const history = conversations.get(channelId);
+  const userText = message.content.trim();
+  if (!userText) return;
+
+  if (userText.toLowerCase() === 'reset') {
+    conversations.delete(channelId);
+    await message.reply('Conversazione resettata!');
+    return;
+  }
+
+  const geminiHistory = history.map(function(m) {
+    return {
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    };
+  });
+
+  history.push({ role: 'user', content: userText });
+
+  try {
+    await message.channel.sendTyping();
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: getSystemPrompt(),
+    });
+
+    const chat = model.startChat({ history: geminiHistory });
+    const result = await chat.sendMessage(userText);
+    const reply = result.response.text();
+
+    history.push({ role: 'assistant', content: reply });
+
+    if (reply.length > 2000) {
+      const chunks = reply.match(/.{1,2000}/gs);
+      for (const chunk of chunks) {
+        await message.reply(chunk);
+      }
+    } else {
+      await message.reply(reply);
+    }
+
+    if (reply.includes('ORDINE_CONFERMATO')) {
+      const notifyChannelId = process.env.NOTIFY_CHANNEL_ID;
+      if (notifyChannelId) {
+        const notifyChannel = await client.channels.fetch(notifyChannelId);
+
+        const summary = history
+          .filter(function(m) { return m.role === 'assistant'; })
+          .reverse()
+          .find(function(m) { return m.content.includes('ORDER SUMMARY') || m.content.includes('RIEPILOGO'); });
+
+        await notifyChannel.send(
+          '💰 NUOVO ORDINE PAGATO!\n👤 Cliente: ' + message.author.username + ' (<@' + message.author.id + '>)\n📌 Canale: <#' + channelId + '>\n\n' + (summary ? summary.content : 'Controlla il canale ticket per i dettagli.')
+        );
+      }
+      conversations.delete(channelId);
+    }
+
+  } catch (error) {
+    console.error('Errore:', error);
+    await message.reply('Errore temporaneo, riprova tra poco!');
+  }
+});
+
+client.on('ready', function() {
+  console.log('Bot online come ' + client.user.tag);
+});
+
+client.login(process.env.DISCORD_TOKEN);
