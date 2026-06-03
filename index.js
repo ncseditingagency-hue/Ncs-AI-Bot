@@ -1,6 +1,5 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const client = new Client({
   intents: [
@@ -11,7 +10,6 @@ const client = new Client({
   ],
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const conversations = new Map();
 
 function getSystemPrompt() {
@@ -36,7 +34,7 @@ function getSystemPrompt() {
     "Style: [style] " +
     "Clips on Drive: [link or Not provided] " +
     "Ask client to confirm yes or no. " +
-    "After confirmation send this (translated to client language): " +
+    "After confirmation send this translated to client language: " +
     "To confirm your order send payment via PayPal. " +
     "PayPal: " + paypal + " " +
     "Send as Friends and Family F&F in euros. " +
@@ -47,12 +45,28 @@ function getSystemPrompt() {
     "then write exactly: ORDINE_CONFERMATO";
 }
 
+async function askGroq(messages) {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + process.env.GROQ_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: messages,
+      max_tokens: 1000,
+    }),
+  });
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
 client.on('channelCreate', async (channel) => {
   if (!channel.isTextBased()) return;
   if (!channel.name.toLowerCase().includes('ticket')) return;
 
   console.log('Nuovo ticket: ' + channel.name);
-
   await new Promise(function(resolve) { setTimeout(resolve, 2000); });
 
   try {
@@ -79,27 +93,17 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  const geminiHistory = history.map(function(m) {
-    return {
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
-    };
-  });
-
   history.push({ role: 'user', content: userText });
 
   try {
     await message.channel.sendTyping();
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: getSystemPrompt(),
-    });
+    const messages = [
+      { role: 'system', content: getSystemPrompt() },
+      ...history
+    ];
 
-    const chat = model.startChat({ history: geminiHistory });
-    const result = await chat.sendMessage(userText);
-    const reply = result.response.text();
-
+    const reply = await askGroq(messages);
     history.push({ role: 'assistant', content: reply });
 
     if (reply.length > 2000) {
