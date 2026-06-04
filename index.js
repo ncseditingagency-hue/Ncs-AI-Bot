@@ -20,7 +20,7 @@ function getSystemPrompt() {
     "Always reply in the same language the client uses. Never say you are an AI. " +
     "ABOUT NCS: " +
     "NCS is the best Editing Market for Speed, Quality and Price. " +
-    "Team: Owner, Staff Member, AI Support Bot, and professional Editors. " +
+    "Team: Owner (Nicolax), Staff Member, AI Support Bot, and professional Editors. " +
     "SERVICES AND PRICE SUGGESTIONS (suggestions only, final price depends on the project): " +
     "Video Editing: Beginner ~15eu, Advanced ~35eu, Professional ~55eu. " +
     "Graphics and Design ~20eu: thumbnails, banners, social media graphics. " +
@@ -29,6 +29,8 @@ function getSystemPrompt() {
     "Every order includes 1 post-production change. " +
     "VIP Upgrades: +5eu for 2 changes, +12eu for 4 changes. " +
     "PAYMENT: Only PayPal F&F in euros. Refunds decided by owner case by case. " +
+    "IMPORTANT: If the client asks to talk to the owner, to Nicolax, or mentions @Nicolax, " +
+    "reply that you have notified the owner and they will be with them shortly. Be reassuring. " +
     "STEPS TO FOLLOW IN ORDER: " +
     "STEP 1: Greet warmly and ask: How can I help you today? " +
     "STEP 2: Understand what they need. If they ask prices, explain briefly as suggestions only, then ask if they want to order. " +
@@ -65,6 +67,18 @@ async function askGroq(messages) {
   });
   const data = await response.json();
   return data.choices[0].message.content;
+}
+
+function wantsOwner(text) {
+  const t = text.toLowerCase();
+  return t.includes('owner') ||
+    t.includes('nicolax') ||
+    t.includes('speak to a human') ||
+    t.includes('talk to a human') ||
+    t.includes('real person') ||
+    t.includes('persona reale') ||
+    t.includes('parlare con') && t.includes('owner') ||
+    t.includes('voglio parlare con');
 }
 
 client.on('channelCreate', async (channel) => {
@@ -118,6 +132,21 @@ client.on('messageCreate', async (message) => {
     conversations.delete(channelId);
     pausedChannels.delete(channelId);
     await message.reply('Conversation reset! ✅');
+    return;
+  }
+
+  // Controlla se vuole parlare con l'owner
+  if (wantsOwner(userText)) {
+    const notifyChannelId = process.env.NOTIFY_CHANNEL_ID;
+    if (notifyChannelId) {
+      const notifyChannel = await client.channels.fetch(notifyChannelId);
+      await notifyChannel.send(
+        '👤 **CLIENTE VUOLE PARLARE CON TE!**\n' +
+        '👤 Cliente: ' + message.author.username + ' (<@' + message.author.id + '>)\n' +
+        '📌 Canale: <#' + channelId + '>'
+      );
+    }
+    await message.reply('✅ I\'ve notified the owner! He\'ll be with you shortly. Please wait a moment 🙏');
     return;
   }
 
